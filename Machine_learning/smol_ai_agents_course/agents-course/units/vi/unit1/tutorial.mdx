@@ -1,0 +1,226 @@
+# Hãy tạo Agent đầu tiên của chúng ta với smolagents
+
+Ở chương trước, ta đã học cách tạo Agent từ đầu bằng Python và **thấy quá trình này tốn công thế nào**. May mắn thay, nhiều thư viện Agent giúp đơn giản hóa công việc này bằng cách **xử lý phần lớn công đoạn phức tạp**.
+
+Trong bài thực hành này, **bạn sẽ tạo Agent đầu tiên của riêng mình** có khả năng thực hiện các hành động như tạo ảnh, tìm kiếm web, kiểm tra múi giờ và hơn thế nữa!
+
+Bạn cũng sẽ publish agent **trên Hugging Face Space để chia sẻ với bạn bè và đồng nghiệp**.
+
+Cùng bắt đầu thôi!
+
+
+## smolagents là gì?
+
+<img src="https://huggingface.co/datasets/agents-course/course-images/resolve/main/en/unit1/smolagents.png" alt="smolagents"/>
+
+Để tạo Agent này, ta sẽ dùng `smolagents` - thư viện **cung cấp framework để phát triển agent dễ dàng**.
+
+Thư viện nhẹ này được thiết kế cho sự đơn giản, nhưng nó đóng gói phần lớn độ phức tạp khi xây dựng Agent, giúp bạn tập trung vào thiết kế hành vi cho agent.
+
+Ta sẽ tìm hiểu sâu hơn về smolagents ở chương tiếp theo. Trong lúc chờ, bạn có thể xem <a href="https://huggingface.co/blog/smolagents" target="_blank">blog post</a> hoặc <a href="https://github.com/huggingface/smolagents" target="_blank">repo GitHub</a> của thư viện.
+
+Tóm lại, `smolagents` là thư viện tập trung vào **codeAgent** - loại agent thực hiện **"Hành động"** qua các khối code, sau đó **"Quan sát"** kết quả bằng cách chạy code.
+
+Đây là ví dụ những gì ta sẽ xây dựng!
+
+Ta cung cấp cho agent **công cụ tạo ảnh** và yêu cầu nó tạo ảnh mèo.
+
+Agent trong `smolagents` sẽ có **hành vi giống với agent tự build trước đây**: nó sẽ **tư duy, hành động và quan sát theo chu kỳ** cho đến khi có câu trả lời cuối:
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/PQDKcWiuln4?si=ysSTDZoi8y55FVvA" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+
+Thú vị quá phải không?
+
+## Cùng build Agent thôi!
+
+Để bắt đầu, duplicate Space này: <a href="https://huggingface.co/spaces/agents-course/First_agent_template" target="_blank">https://huggingface.co/spaces/agents-course/First_agent_template</a>
+> Cảm ơn <a href="https://huggingface.co/m-ric" target="_blank">Aymeric</a> đã tạo template này! 🙌
+
+Duplicate Space nghĩa là **tạo bản copy local trên profile của bạn**:
+<img src="https://huggingface.co/datasets/agents-course/course-images/resolve/main/en/unit1/duplicate-space.gif" alt="Duplicate"/>
+
+Xuyên suốt Bài học này, file duy nhất bạn cần sửa là **"app.py"** (hiện đang chưa hoàn thiện). Bạn có thể xem [bản gốc trong template](https://huggingface.co/spaces/agents-course/First_agent_template/blob/main/app.py). Để tìm bản của bạn, vào bản copy Space, click tab `Files` rồi chọn `app.py` trong danh sách.
+
+Cùng phân tích code nhé:
+
+- File bắt đầu với các thư viện cần thiết
+
+```python
+from smolagents import CodeAgent, DuckDuckGoSearchTool, HfApiModel, load_tool, tool
+import datetime
+import requests
+import pytz
+import yaml
+from tools.final_answer import FinalAnswerTool
+```
+
+Như đã đề cập, ta sẽ dùng trực tiếp lớp **CodeAgent** từ **smolagents**.
+
+
+### Các Tools
+
+Giờ đến phần Tools! Nếu cần ôn lại về Tools, hãy xem lại [phần Tools](tools) của khóa học.
+
+```python
+@tool
+def my_custom_tool(arg1:str, arg2:int)-> str: # quan trọng phải chỉ định kiểu trả về
+    # Giữ nguyên định dạng này cho mô tả công cụ/mô tả đối số nhưng hãy thoải mái sửa đổi công cụ
+    """Công cụ chưa làm gì cả
+    Args:
+        arg1: đối số đầu tiên
+        arg2: đối số thứ hai
+    """
+    return "Bạn sẽ tạo ra phép thuật gì đây?"
+
+@tool
+def get_current_time_in_timezone(timezone: str) -> str:
+    """Công cụ lấy giờ hiện tại theo múi giờ chỉ định.
+    Args:
+        timezone: Chuỗi biểu diễn múi giờ hợp lệ (ví dụ: 'America/New_York').
+    """
+    try:
+        # Tạo object múi giờ
+        tz = pytz.timezone(timezone)
+        # Lấy giờ hiện tại theo múi giờ đó
+        local_time = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+        return f"Giờ hiện tại tại {timezone} là: {local_time}"
+    except Exception as e:
+        return f"Lỗi khi lấy giờ cho múi giờ '{timezone}': {str(e)}"
+```
+
+
+Đây chính là phần chúng mình khuyến khích bạn xây dựng! Chúng mình cung cấp hai ví dụ:
+
+1. **Tool ảo** chưa hoạt động để bạn có thể sửa thành tool hữu ích.
+2. **Tool thực sự hoạt động** để lấy giờ hiện tại ở bất kỳ đâu.
+
+Khi định nghĩa tool, quan trọng phải:
+
+1. Chỉ định kiểu đầu vào/ra cho hàm, ví dụ `get_current_time_in_timezone(timezone: str) -> str:`
+2. **Docstring định dạng chuẩn**. `smolagents` yêu cầu mọi đối số phải có **mô tả bằng text trong docstring**.
+
+### Agent
+
+Agent sử dụng [`Qwen/Qwen2.5-Coder-32B-Instruct`](https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct) làm LLM engine. Đây là mô hình mạnh mẽ mà ta sẽ truy cập qua serverless API.
+
+```python
+final_answer = FinalAnswerTool()
+model = HfApiModel(
+    max_tokens=2096,
+    temperature=0.5,
+    model_id='Qwen/Qwen2.5-Coder-32B-Instruct',
+    custom_role_conversions=None,
+)
+
+with open("prompts.yaml", 'r') as stream:
+    prompt_templates = yaml.safe_load(stream)
+    
+# Tạo CodeAgent
+agent = CodeAgent(
+    model=model,
+    tools=[final_answer], # thêm tools của bạn vào đây (đừng xóa final_answer)
+    max_steps=6,
+    verbosity_level=1,
+    grammar=None,
+    planning_interval=None,
+    name=None,
+    description=None,
+    prompt_templates=prompt_templates
+)
+
+GradioUI(agent).launch()
+```
+
+Agent này vẫn dùng `InferenceClient` mà ta đã thấy ở phần trước thông qua lớp **HfApiModel**!
+
+Chúng mình sẽ đưa thêm ví dụ chi tiết khi giới thiệu framework ở chương 2. Hiện tại, bạn cần tập trung vào **thêm tool mới vào danh sách tools** qua tham số `tools` của Agent.
+
+Ví dụ bạn có thể dùng `DuckDuckGoSearchTool` đã được import ở dòng đầu, hoặc xem qua `image_generation_tool` được load từ Hub ở phần sau.
+
+**Thêm tools sẽ mở rộng khả năng cho agent** - hãy sáng tạo nhé!
+
+Toàn bộ "app.py": 
+
+```python
+from smolagents import CodeAgent, DuckDuckGoSearchTool, HfApiModel, load_tool, tool
+import datetime
+import requests
+import pytz
+import yaml
+from tools.final_answer import FinalAnswerTool
+
+from Gradio_UI import GradioUI
+
+# Đây là ví dụ tool chưa làm gì. Hãy khiến chúng mình kinh ngạc với sáng tạo của bạn!
+@tool
+def my_custom_tool(arg1:str, arg2:int)-> str: # quan trọng phải chỉ định kiểu trả về
+    # Giữ nguyên định dạng này cho mô tả công cụ/mô tả đối số nhưng hãy thoải mái sửa đổi công cụ
+    """Công cụ chưa làm gì cả
+    Args:
+        arg1: đối số đầu tiên
+        arg2: đối số thứ hai
+    """
+    return "Bạn sẽ tạo ra phép thuật gì đây?"
+
+@tool
+def get_current_time_in_timezone(timezone: str) -> str:
+    """Công cụ lấy giờ hiện tại theo múi giờ chỉ định.
+    Args:
+        timezone: Chuỗi biểu diễn múi giờ hợp lệ (ví dụ: 'America/New_York').
+    """
+    try:
+        # Tạo object múi giờ
+        tz = pytz.timezone(timezone)
+        # Lấy giờ hiện tại theo múi giờ đó
+        local_time = datetime.datetime.now(tz).strftime("%Y-%m-%d %H:%M:%S")
+        return f"Giờ hiện tại tại {timezone} là: {local_time}"
+    except Exception as e:
+        return f"Lỗi khi lấy giờ cho múi giờ '{timezone}': {str(e)}"
+
+
+final_answer = FinalAnswerTool()
+model = HfApiModel(
+max_tokens=2096,
+temperature=0.5,
+model_id='Qwen/Qwen2.5-Coder-32B-Instruct',
+custom_role_conversions=None,
+)
+
+
+# Import tool từ Hub
+image_generation_tool = load_tool("agents-course/text-to-image", trust_remote_code=True)
+
+with open("prompts.yaml", 'r') as stream:
+    prompt_templates = yaml.safe_load(stream)
+    
+agent = CodeAgent(
+    model=model,
+    tools=[final_answer], # thêm tools của bạn vào đây (đừng xóa final_answer)
+    max_steps=6,
+    verbosity_level=1,
+    grammar=None,
+    planning_interval=None,
+    name=None,
+    description=None,
+    prompt_templates=prompt_templates
+)
+
+
+GradioUI(agent).launch()
+```
+
+**Mục tiêu** của bạn là làm quen với Space và Agent. 
+
+Hiện tại, Agent trong template **chưa dùng tool nào**, hãy thử cung cấp cho nó các tool có sẵn hoặc tự tạo tool mới!
+
+Chúng mình rất mong chờ thành quả Agent tuyệt vời của bạn ở kênh discord **#agents-course-showcase**!
+
+
+---
+Chúc mừng bạn đã build xong Agent đầu tiên! Đừng ngại chia sẻ với bạn bè và đồng nghiệp nhé.
+
+Vì đây là lần đầu thử nghiệm, việc Agent có lỗi nhỏ hoặc chạy chậm là hoàn toàn bình thường. Ở các chương sau, ta sẽ học cách xây dựng Agent tốt hơn.
+
+Cách học tốt nhất là thực hành, nên đừng ngần ngại cập nhật nó, thêm tool mới, thử với mô hình khác, v.v.
+
+Ở phần tiếp theo, bạn sẽ hoàn thành Bài kiểm tra cuối cùng và nhận chứng chỉ!
